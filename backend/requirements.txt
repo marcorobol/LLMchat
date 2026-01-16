@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+openai
+python-dotenv
+Pillow
+pytesseract
+requests
+zai-sdk
+pypdf
+
