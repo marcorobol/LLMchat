@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, watch } from 'vue'
-import { Send, Bot, User, Cpu } from 'lucide-vue-next'
+import { Send, Bot, User, Cpu, Paperclip, X } from 'lucide-vue-next'
 
 const props = defineProps({
   messages: {
@@ -10,12 +10,17 @@ const props = defineProps({
   isLoading: {
     type: Boolean,
     default: false
+  },
+  uploadedFiles: {
+    type: Array,
+    default: () => []
   }
 })
 
-const emit = defineEmits(['send-message'])
+const emit = defineEmits(['send-message', 'files-selected'])
 const newMessage = ref('')
 const messagesContainer = ref(null)
+const isDragging = ref(false)
 
 const sendMessage = () => {
   if (!newMessage.value.trim() || props.isLoading) return
@@ -27,6 +32,45 @@ const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+
+const fileInput = ref(null)
+
+const triggerFileSelect = () => {
+  fileInput.value.click()
+}
+
+const onFileSelect = (e) => {
+  const files = Array.from(e.target.files)
+  const newFiles = [...props.uploadedFiles, ...files]
+  emit('files-selected', newFiles)
+  // Reset input
+  e.target.value = ''
+}
+
+const removeFile = (index) => {
+  const newFiles = props.uploadedFiles.filter((_, i) => i !== index)
+  emit('files-selected', newFiles)
+}
+
+const onDragOver = (e) => {
+  e.preventDefault()
+  isDragging.value = true
+}
+
+const onDragLeave = (e) => {
+  e.preventDefault()
+  isDragging.value = false
+}
+
+const onDrop = (e) => {
+  e.preventDefault()
+  isDragging.value = false
+  const files = Array.from(e.dataTransfer.files)
+  if (files.length > 0) {
+    const newFiles = [...props.uploadedFiles, ...files]
+    emit('files-selected', newFiles)
   }
 }
 
@@ -43,7 +87,14 @@ watch(() => props.messages, scrollToBottom, { deep: true })
       </div>
     </div>
 
-    <div class="messages-area" ref="messagesContainer">
+    <div
+      class="messages-area"
+      :class="{ 'dragging': isDragging }"
+      ref="messagesContainer"
+      @dragover="onDragOver"
+      @dragleave="onDragLeave"
+      @drop="onDrop"
+    >
       <div v-if="messages.length === 0" class="welcome-message">
         <Cpu class="welcome-icon" :size="48" />
         <h3>How can I help you today?</h3>
@@ -88,14 +139,40 @@ watch(() => props.messages, scrollToBottom, { deep: true })
     </div>
 
     <div class="input-area">
+      <div v-if="uploadedFiles.length > 0" class="files-preview">
+        <div v-for="(file, index) in uploadedFiles" :key="index" class="file-chip">
+          <span class="file-name">{{ file.name }}</span>
+          <button @click="removeFile(index)" class="file-remove">
+            <X size="14" />
+          </button>
+        </div>
+      </div>
+
+      <input
+        type="file"
+        ref="fileInput"
+        class="hidden-input"
+        multiple
+        accept=".pdf,.docx,.txt,.jpg,.png"
+        @change="onFileSelect"
+      />
+
       <div class="input-wrapper">
-        <textarea 
-          v-model="newMessage" 
-          placeholder="Ask a question about your documents..." 
+        <button
+          @click="triggerFileSelect"
+          class="attach-btn"
+          title="Attach files"
+        >
+          <Paperclip size="20" />
+        </button>
+
+        <textarea
+          v-model="newMessage"
+          placeholder="Ask a question about your documents..."
           @keydown.enter.prevent="sendMessage"
         ></textarea>
-        <button 
-          @click="sendMessage" 
+        <button
+          @click="sendMessage"
           class="send-btn primary-btn"
           :disabled="!newMessage.trim() || isLoading"
         >
@@ -151,6 +228,25 @@ watch(() => props.messages, scrollToBottom, { deep: true })
   flex-direction: column;
   gap: 15px;
   background: rgba(0, 0, 0, 0.2);
+  transition: var(--transition-normal);
+  position: relative;
+}
+
+.messages-area.dragging {
+  background: rgba(0, 240, 255, 0.1);
+  border: 2px dashed var(--color-primary);
+}
+
+.messages-area.dragging::after {
+  content: 'Drop files to attach';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.2em;
+  color: var(--color-primary);
+  font-weight: 500;
+  pointer-events: none;
 }
 
 .welcome-message {
@@ -295,5 +391,69 @@ textarea:focus {
 @keyframes typing {
   0%, 100% { transform: translateY(0); opacity: 0.6; }
   50% { transform: translateY(-5px); opacity: 1; }
+}
+
+.hidden-input {
+  display: none;
+}
+
+.files-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 12px 8px 12px;
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 0.85em;
+}
+
+.file-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-remove {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.file-remove:hover {
+  color: #ff4d4d;
+  background: rgba(255, 77, 77, 0.1);
+}
+
+.attach-btn {
+  width: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.attach-btn:hover {
+  color: var(--color-primary);
+  background: rgba(0, 240, 255, 0.1);
 }
 </style>

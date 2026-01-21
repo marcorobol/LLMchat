@@ -72,9 +72,37 @@ async def upload_laws(files: List[UploadFile] = File(...)):
     uploaded_names = []
     for file in files:
         uploaded_names.append(file.filename)
-from utils.lmstudio_utils import get_model_context_length
+from utils.lmstudio_utils import get_model_context_length, get_models_list, load_model, unload_model
 
 # ...
+
+@app.post("/models/{model_id}/load")
+async def load_model_endpoint(model_id: str):
+    """
+    Load a model in LM Studio.
+    """
+    result = await load_model(model_id)
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+@app.post("/models/{model_id}/unload")
+async def unload_model_endpoint(model_id: str):
+    """
+    Unload a model from LM Studio.
+    """
+    result = await unload_model(model_id)
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+@app.get("/models")
+async def list_models():
+    """
+    Retrieves all available models with their information including state.
+    """
+    models = await get_models_list()
+    return {"data": models}
 
 @app.get("/model/info")
 async def get_model_info(model_id: str):

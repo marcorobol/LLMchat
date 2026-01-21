@@ -1,4 +1,80 @@
 import httpx
+from typing import List, Dict, Optional
+
+LM_STUDIO_API = "http://bears.disi.unitn.it:1234/api/v0"
+
+async def load_model(model_id: str) -> Dict:
+    """
+    Load a model in LM Studio.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{LM_STUDIO_API}/models/{model_id}/load",
+                timeout=60.0  # Loading can take a while
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {"error": f"Failed to load model: {response.status_code}"}
+    except Exception as e:
+        print(f"LM Studio Load Error: {e}")
+        return {"error": str(e)}
+
+async def unload_model(model_id: str) -> Dict:
+    """
+    Unload a model from LM Studio.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{LM_STUDIO_API}/models/{model_id}/unload",
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {"error": f"Failed to unload model: {response.status_code}"}
+    except Exception as e:
+        print(f"LM Studio Unload Error: {e}")
+        return {"error": str(e)}
+
+async def get_models_list() -> List[Dict]:
+    """
+    Fetches all models from LM Studio REST API with their full information.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{LM_STUDIO_API}/models", timeout=5.0)
+
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data", [])
+
+            return []
+
+    except Exception as e:
+        print(f"LM Studio API Error: {e}")
+        return []
+
+async def get_model_info(model_id: str) -> Optional[Dict]:
+    """
+    Fetches information about a specific model from LM Studio REST API.
+    Returns None if model not found.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{LM_STUDIO_API}/models", timeout=5.0)
+
+            if response.status_code == 200:
+                data = response.json()
+                for model in data.get("data", []):
+                    if model.get("id") == model_id:
+                        return model
+
+            return None
+
+    except Exception as e:
+        print(f"LM Studio API Error: {e}")
+        return None
 
 async def get_model_context_length(model_id: str) -> int:
     """
@@ -7,7 +83,7 @@ async def get_model_context_length(model_id: str) -> int:
     try:
         # Use simple REST API call instead of heavy SDK
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://bears.disi.unitn.it:1234/api/v0/models", timeout=5.0)
+            response = await client.get(f"{LM_STUDIO_API}/models", timeout=5.0)
             
             if response.status_code == 200:
                 data = response.json()
